@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Historique</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Historique des parties</h1>
+    <a href="/">Retour au menu</a>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Player 1</th>
+                <th>Player 2</th>
+                <th>Moves</th>
+                <th>Winner</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for g in games %}
+            <tr>
+                <td>{{g[0]}}</td>
+                <td>{{g[1]}}</td>
+                <td>{{g[2]}}</td>
+                <td>{{g[3]}}</td>
+                <td>{{g[4]}}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    
+
+    <script>
+        // Hover dynamique sur chaque ligne
+        document.querySelectorAll('table tbody tr').forEach(row => {
+            row.addEventListener('mouseenter', () => {
+                row.style.transform = 'scale(1.02)';
+            });
+            row.addEventListener('mouseleave', () => {
+                row.style.transform = 'scale(1)';
+            });
+        });
+    </script>
+</body>
+</html>

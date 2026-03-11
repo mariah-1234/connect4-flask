@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Puissance 4</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+<body>
+
+<div class="game-container">
+
+<h1>Puissance 4</h1>
+<p id="status"></p>
+<canvas id="board" width="450" height="510"></canvas>
+
+<div class="buttons">
+
+<button onclick="undo()">Undo</button>
+<button onclick="restart()">Restart</button>
+<button onclick="setAI('random')">IA Random</button>
+<button onclick="setAI('minimax')">IA Minimax</button>
+<button onclick="setDepth()">Profondeur</button>
+<button onclick="saveGame()">💾 Save</button>
+<button onclick="goMenu()">🏠 Menu</button>
+
+</div>
+
+
+
+</div>
+
+<script>
+
+const ROWS = 9
+const COLS = 9
+const CELL = 50
+const TOP_MARGIN = 60
+
+let game_id = {{ game_id | tojson }};
+let mode = {{ mode | tojson }};
+
+let board = Array.from({length: ROWS}, () => Array(COLS).fill("."))
+
+let canvas = document.getElementById("board")
+let ctx = canvas.getContext("2d")
+
+let gameFinished = false
+let currentPlayer = "R" // initial player
+
+// ---------------- DRAW BOARD ----------------
+function drawBoard(){
+
+    ctx.fillStyle = "blue"
+    ctx.fillRect(0,0,COLS*CELL, TOP_MARGIN + ROWS*CELL)
+
+    for(let c=0;c<COLS;c++){
+        ctx.fillStyle="white"
+        ctx.font="16px Arial"
+        ctx.fillText(c, c*CELL + CELL/2 -4, TOP_MARGIN - 30)
+    }
+
+    for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+            let x = c*CELL
+            let y = TOP_MARGIN + r*CELL
+
+            ctx.beginPath()
+            ctx.arc(x+CELL/2, y+CELL/2, CELL/2-5,0,Math.PI*2)
+
+            if(board[r][c]=="R") ctx.fillStyle="red"
+            else if(board[r][c]=="Y") ctx.fillStyle="yellow"
+            else ctx.fillStyle="white"
+
+            ctx.fill()
+            ctx.stroke()
+        }
+    }
+}
+
+// ---------------- WINNING LINE ----------------
+function drawWinningLine(line){
+
+    ctx.strokeStyle = "lime"
+    ctx.lineWidth = 6
+
+    let start = line[0]
+    let end = line[line.length-1]
+
+    let x1 = start[1]*CELL + CELL/2
+    let y1 = TOP_MARGIN + start[0]*CELL + CELL/2
+
+    let x2 = end[1]*CELL + CELL/2
+    let y2 = TOP_MARGIN + end[0]*CELL + CELL/2
+
+    ctx.beginPath()
+    ctx.moveTo(x1,y1)
+    ctx.lineTo(x2,y2)
+    ctx.stroke()
+}
+
+drawBoard()
+document.getElementById("status").innerText = "Tour du joueur : " + currentPlayer
+
+// ---------------- CLICK HUMAIN ----------------
+canvas.addEventListener("click", async (e)=>{
+    if(gameFinished) return
+
+    let col = Math.floor(e.offsetX/CELL)
+    await playMove(col)
+})
+
+// ---------------- PLAY MOVE ----------------
+async function playMove(col){
+
+    const resp = await fetch("/play_move",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({game_id, col})
+    })
+
+    const data = await resp.json()
+    board = data.board
+    currentPlayer = data.current_player || currentPlayer
+    drawBoard()
+
+    // mise à jour du tour
+    if(!data.winner){
+        document.getElementById("status").innerText = "Tour du joueur : " + currentPlayer
+    }
+
+    // victoire
+    if(data.winner){
+        gameFinished = true
+        document.getElementById("status").innerText = "Victoire : " + data.winner
+        drawWinningLine(data.line)
+        return
+    }
+}
+
+// ---------------- IA VS IA ----------------
+async function aiTurn(){
+
+    if(gameFinished) return
+
+    const resp = await fetch("/ai_move",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({game_id})
+    })
+
+    const data = await resp.json()
+    board = data.board
+    currentPlayer = data.current_player || currentPlayer
+    drawBoard()
+
+    if(!data.winner){
+        document.getElementById("status").innerText = "Tour du joueur : " + currentPlayer
+    }
+
+    if(data.winner){
+        gameFinished = true
+        document.getElementById("status").innerText = "Victoire : " + data.winner
+        drawWinningLine(data.line)
+        return
+    }
+
+    setTimeout(aiTurn,500)
+}
+
+// ---------------- UNDO ----------------
+async function undo(){
+
+    const resp = await fetch("/undo_move",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({game_id})
+    })
+
+    const data = await resp.json()
+    board = data.board
+    gameFinished = false
+    currentPlayer = "R"
+    drawBoard()
+    document.getElementById("status").innerText="Tour du joueur : " + currentPlayer
+}
+
+// ---------------- RESTART ----------------
+async function restart(){
+
+    const resp = await fetch("/restart_game",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({game_id})
+    })
+
+    const data = await resp.json()
+    board = data.board
+    gameFinished = false
+    currentPlayer = "R"
+    drawBoard()
+    document.getElementById("status").innerText="Tour du joueur : " + currentPlayer
+}
+
+// ---------------- SAVE GAME ----------------
+async function saveGame(){
+
+    const resp = await fetch("/save_game",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({game_id})
+    })
+
+    const data = await resp.json()
+    alert(data.message)
+}
+
+// ---------------- MENU ----------------
+function goMenu(){
+    window.location.href="/"
+}
+
+// ---------------- IA TYPE ----------------
+async function setAI(type){
+
+    await fetch("/set_ai_type",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({game_id, ai_type:type})
+    })
+
+    alert("IA réglée sur "+type)
+}
+
+// ---------------- DEPTH ----------------
+async function setDepth(){
+
+    let d = prompt("Nouvelle profondeur (1-8) :",4)
+    if(!d) return
+
+    await fetch("/set_ai_depth",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({game_id, depth:parseInt(d)})
+    })
+
+    alert("Profondeur réglée sur "+d)
+}
+
+// ---------------- AUTO START IA VS IA ----------------
+if(mode==0){
+    setTimeout(aiTurn,600)
+}
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,200 @@
+/* ========================== */
+/* STYLE GÉNÉRAL LUXE WOW     */
+/* ========================== */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0b0c10, #1f2833);
+    color: #fff;
+    text-align: center;
+    overflow-x: hidden;
+}
+
+/* ========================== */
+/* TITRES PRINCIPAUX          */
+/* ========================== */
+h1, h2, h3 {
+    font-weight: 700;
+    margin: 20px 0;
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00fff0, #7b5fff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 10px #00fff033, 0 0 20px #7b5fff33;
+}
+
+/* ========================== */
+/* CONTENEURS PRINCIPAUX      */
+/* ========================== */
+.menu-container, .game-container, .replay-container {
+    margin: 30px auto;
+    padding: 20px 25px;
+    max-width: 500px;
+    background: #121629;
+    border-radius: 20px;
+    box-shadow: 0 0 35px rgba(0,255,240,0.2), 0 0 25px rgba(123,95,255,0.15);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.menu-container:hover, .game-container:hover, .replay-container:hover {
+    transform: scale(1.01);
+    box-shadow: 0 0 50px rgba(0,255,240,0.3), 0 0 30px rgba(123,95,255,0.2);
+}
+
+/* ========================== */
+/* BOUTONS CHOIX DE MODE WOW  */
+/* ========================== */
+.mode-button, button {
+    display: inline-block;
+    padding: 8px 18px;
+    margin: 6px 5px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #00fff0, #7b5fff);
+    border: 2px solid #00fff0;
+    border-radius: 15px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.25s ease;
+    min-width: 100px;
+    box-shadow: 0 3px 12px rgba(0,255,240,0.25), 0 0 8px rgba(123,95,255,0.15);
+}
+
+.mode-button:hover, button:hover {
+    color: #121212;
+    background: linear-gradient(135deg, #7b5fff, #00fff0);
+    box-shadow: 0 0 20px #00fff0, 0 0 30px #7b5fff;
+    transform: translateY(-2px) scale(1.05);
+}
+
+/* ========================== */
+/* LIENS / MENU / STATS WOW    */
+/* ========================== */
+.menu-link, a {
+    display: inline-block;
+    padding: 6px 14px;
+    margin: 5px 3px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #00fff0;
+    background: #1a1f38;
+    border: 1.5px solid #7b5fff;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-decoration: none;
+    min-width: 90px;
+}
+
+.menu-link:hover, a:hover {
+    color: #fff;
+    background: linear-gradient(90deg, #7b5fff, #00fff0);
+    box-shadow: 0 0 12px #00fff0, 0 0 20px #7b5fff;
+    transform: translateY(-2px) scale(1.03);
+}
+
+/* ========================== */
+/* INPUTS BGA                 */
+/* ========================== */
+.bga-container input {
+    width: calc(100% - 20px);
+    padding: 6px 8px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+    border: 1.5px solid #7b5fff;
+    background: #1a1f38;
+    color: #00fff0;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.25s;
+}
+
+.bga-container input:focus {
+    outline: none;
+    border-color: #00fff0;
+    box-shadow: 0 0 10px #00fff0;
+}
+
+/* ========================== */
+/* CANVAS / PLATEAU           */
+/* ========================== */
+canvas {
+    border: 3px solid #00fff033;
+    border-radius: 15px;
+    background: #121629;
+    box-shadow: 0 0 20px #00fff033, 0 0 25px #7b5fff22;
+    margin-bottom: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+/* ========================== */
+/* STATUS TOUR JOUEUR EN HAUT */
+/* ========================== */
+#status {
+    font-size: 1.15rem;
+    font-weight: bold;
+    margin: 10px 0 15px 0;
+    color: #00fff0;
+    text-shadow: 0 0 6px #00fff0, 0 0 12px #7b5fff;
+}
+
+/* ========================== */
+/* TABLE HISTORIQUE           */
+/* ========================== */
+table {
+    margin: 15px auto;
+    border-collapse: collapse;
+    width: 90%;
+    background: #1a1f38;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 0 25px rgba(0,255,240,0.2), 0 0 15px rgba(123,95,255,0.1);
+}
+
+th, td {
+    padding: 8px 12px;
+    text-align: center;
+    border-bottom: 1px solid #222;
+    transition: all 0.25s;
+}
+
+th {
+    background: #1a1f38;
+    color: #00fff0;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+td {
+    color: #ffffffcc;
+}
+
+tr:hover td {
+    background: linear-gradient(90deg, #00fff022, #7b5fff22);
+    color: #fff;
+    transform: scale(1.01);
+}
+
+/* ========================== */
+/* STAT BARRES ANIMÉES        */
+/* ========================== */
+.stat-bar {
+    height: 20px;
+    border-radius: 12px;
+    background: #1a1f38;
+    margin: 10px auto;
+    width: 70%;
+    overflow: hidden;
+    box-shadow: inset 0 0 6px #7b5fff44;
+}
+
+.stat-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #00fff0, #7b5fff);
+    border-radius: 12px;
+    transition: width 1.2s ease-in-out;
+}

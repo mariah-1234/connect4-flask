@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Menu Puissance 4</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="menu-container">
+        <h1>Puissance 4</h1>
+        <form action="{{ url_for('start_game') }}" method="post">
+            <button type="submit" name="mode" value="0">IA vs IA</button>
+            <button type="submit" name="mode" value="1">Humain vs IA</button>
+            <button type="submit" name="mode" value="2">Humain vs Humain</button>
+        </form>
+        <a href="{{ url_for('stats') }}" class="menu-link">📊 Statistiques</a>
+        <a href="{{ url_for('history') }}" class="menu-link">🕘 Historique des parties</a>
+        <div class="bga-container">
+            <h3>Charger une partie BGA</h3>
+            <input type="text" id="bga_url" placeholder="Lien BGA">
+            <button onclick="loadBGA()">Charger</button>
+        </div>
+    </div>
+
+    <script>
+async function loadBGA() {
+    const url = document.getElementById('bga_url').value;
+    if (!url) return alert("Entrez le lien BGA");
+
+    // 1️⃣ Récupérer les coups depuis ton serveur
+    const resp = await fetch("/scrape_bga", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({url})
+    });
+    const data = await resp.json();
+
+    if (!data.moves || data.moves.length === 0) return alert("Aucun coup récupéré");
+
+    // 2️⃣ Créer un nouveau jeu sur le serveur avec ces coups
+    const createResp = await fetch("/start_bga_game", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({moves: data.moves})
+    });
+    const createData = await createResp.json();
+
+    if (!createData.game_id) return alert("Erreur lors de la création du jeu");
+
+    // 3️⃣ Rediriger vers la page du plateau avec le jeu chargé
+    window.location.href = "/play/" + createData.game_id;
+}
+</script>
+</body>
+</html>

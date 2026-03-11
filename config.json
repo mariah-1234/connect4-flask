@@ -1,0 +1,7 @@
+{
+  "rows": 9,
+  "cols": 9,
+  "first_player": "R",
+  "ai_depth": 3,
+  "default_confidence": 1
+}
