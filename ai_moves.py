@@ -64,7 +64,7 @@ def choose_move(board, confidence):
         g = Game()
         g.board = [row[:] for row in board]
 
-        score, col = minimax(g, 3, True, "R")
+        score, col = minimax(g, 3, -9999999, 9999999, True, "R")
 
         if col is None:
             return random.choice(possible_moves)

@@ -1,4 +1,5 @@
 import psycopg2
+import os
 from psycopg2.extras import execute_values
 from datetime import datetime
 
@@ -6,13 +7,19 @@ from datetime import datetime
 # Connexion PostgreSQL
 # ==========================
 def get_connection():
-    return psycopg2.connect(
-        dbname="connect4",
-        user="postgres",
-        password="MARIA",
-        host="localhost",
-        port=5432
-    )
+    # Si DATABASE_URL est défini (Render ou autre prod)
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url:
+        return psycopg2.connect(db_url)
+    else:
+        # Connexion locale pour tests
+        return psycopg2.connect(
+            dbname="connect4",
+            user="postgres",
+            password="MARIA",
+            host="localhost",
+            port=5432
+        )
 
 # ==========================
 # Encode / Decode Base3
@@ -39,7 +46,6 @@ def sym_board(board):
 # INSERTION SITUATION
 # ==========================
 def insert_situation(base3_hex, sym_base3_hex=None, rows=8, cols=9, result=3, confidence=1):
-    """Insère ou met à jour une situation"""
     if sym_base3_hex is None:
         sym_base3_hex = base3_hex[::-1]  # simple symétrie
     
@@ -63,7 +69,6 @@ def insert_situation(base3_hex, sym_base3_hex=None, rows=8, cols=9, result=3, co
 # INSERTION GAME
 # ==========================
 def insert_game(player1, player2, moves, winner=3, status=3):
-    """Insère une partie et retourne l'id"""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
@@ -112,7 +117,6 @@ def insert_game_moves_bulk(game_id, moves_list):
 # RECUPERATION SITUATION
 # ==========================
 def get_situation_by_base3(base3_hex):
-    """Retourne situation ou None"""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
@@ -144,7 +148,7 @@ def get_statistics():
     return {"total": total_games, "rouge": rouge_wins, "jaune": jaune_wins, "draws": draws}
 
 # ==========================
-# UTILITAIRE : DERNIERE SITUATION D’UNE PARTIE
+# DERNIERE SITUATION D’UNE PARTIE
 # ==========================
 def last_situation(game_id):
     conn = get_connection()
@@ -159,11 +163,11 @@ def last_situation(game_id):
     cur.close()
     conn.close()
     return res[0] if res else None
+
 # ==========================
 # Récupérer toutes les parties
 # ==========================
 def fetch_games(limit=500):
-    """Retourne une liste de parties sous forme de dicts"""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(

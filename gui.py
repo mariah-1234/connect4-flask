@@ -6,11 +6,12 @@ from puissance4 import check_victory
 from save_load import save_game, load_game, list_saves
 from save_to_db import save_game_from_list
 from config import ROWS, COLS, AI_DEPTH
+from db import insert_game, encode_base3, insert_situation, insert_game_move
 
 # -----------------------
 # Taille des cellules adaptée pour 9x9
 # -----------------------
-CELL = 50        # réduit un peu pour que tout rentre
+CELL = 50
 TOP_MARGIN = 60
 BOTTOM_MARGIN = 60
 
@@ -23,6 +24,7 @@ COLORS = {
 class Connect4GUI:
     def __init__(self, mode):
         self.mode = mode
+        self.ai_one_move = False
         self.game_saved = False
         self.moves_history = []
 
@@ -36,18 +38,14 @@ class Connect4GUI:
         self.ai_type = "minimax"
         self.depth = AI_DEPTH
 
-        # -----------------------
         # Canvas adapté pour 9x9
-        # -----------------------
         w = COLS * CELL
         h = TOP_MARGIN + ROWS * CELL + BOTTOM_MARGIN
         self.canvas = tk.Canvas(self.root, width=w, height=h, bg="blue")
         self.canvas.pack()
         self.canvas.bind("<Button-1>", self.on_click)
 
-        # -----------------------
         # Texte joueur
-        # -----------------------
         self.turn_text = self.canvas.create_text(
             w//2, TOP_MARGIN//2,
             text=f"Au tour du joueur {self.game.current_player}",
@@ -116,6 +114,7 @@ class Connect4GUI:
         tk.Button(frame, text="Load", command=self.load_txt_or_db).pack(side="left")
         tk.Button(frame, text="IA Random", command=self.set_random).pack(side="left")
         tk.Button(frame, text="IA Minimax", command=self.set_minimax).pack(side="left")
+        tk.Button(frame, text="Minimax (1 coup)", command=self.play_ai_once).pack(side="left")
         tk.Button(frame, text="Profondeur", command=self.set_depth).pack(side="left")
         tk.Button(frame, text="Quit", command=self.root.destroy).pack(side="left")
 
@@ -130,7 +129,6 @@ class Connect4GUI:
         self.canvas.itemconfig(self.turn_text, text=f"Au tour du joueur {self.game.current_player}")
         self.update_weights()
         self.highlight_winner()
-        self.check_end()
 
     # -----------------------
     # Poids Minimax
@@ -144,7 +142,7 @@ class Connect4GUI:
                 continue
             g = self.game.copy()
             g.play(c)
-            score,_ = minimax(g, self.depth, False, self.ai_player)
+            score,_ = minimax(g, self.depth, -9999999, 9999999, False, self.ai_player)
             self.canvas.itemconfig(self.weights[c], text=str(score))
 
     # -----------------------
@@ -172,7 +170,7 @@ class Connect4GUI:
             self.root.after(100, self.ai_turn)
 
     # -----------------------
-    # Tour IA
+    # Tour IA complet (mode automatique)
     # -----------------------
     def ai_turn(self):
         if self.mode == 2 or not self.game.valid_moves():
@@ -182,30 +180,13 @@ class Connect4GUI:
             import random
             col = random.choice(self.game.valid_moves())
         else:
-            _, col = minimax(self.game, self.depth, True, current)
+            _, col = minimax(self.game, self.depth, -9999999, 9999999, True, current)
         if col is not None:
             self.game.play(col)
             self.moves_history.append(col)
             self.update_board()
         if self.mode==0:
             self.root.after(300, self.ai_turn)
-
-    # -----------------------
-    # Fin partie
-    # -----------------------
-    def check_end(self):
-        winner, line = check_victory(self.game.board)
-        if winner and not self.game_saved:
-            messagebox.showinfo("Fin de partie", f"Victoire du joueur {winner}")
-            save_game_from_list(
-                player1="Humain",
-                player2="IA" if self.mode==1 else "Humain",
-                mode=self.mode,
-                moves_list=self.moves_history
-            )
-            self.game_saved = True
-            self.ai_enabled = False
-            self.human_enabled = False
 
     # -----------------------
     # Undo / Restart / Save
@@ -225,9 +206,17 @@ class Connect4GUI:
         self.update_board()
 
     def save(self):
+        """Enregistre uniquement quand on clique sur Save"""
         name = simpledialog.askstring("Sauvegarde", "Nom de la partie :")
         if name:
-            save_game(self.game, name)
+            save_game_from_list(
+                player1="Humain",
+                player2="IA" if self.mode==1 else "Humain",
+                mode=self.mode,
+                moves_list=self.moves_history
+            )
+            messagebox.showinfo("Sauvegarde", "Partie enregistrée dans la BDD !")
+            self.game_saved = True
 
     # -----------------------
     # Load (BDD ou TXT)
@@ -264,7 +253,6 @@ class Connect4GUI:
         self.game = Game()
         for col in self.moves_history:
             self.game.play(col)
-        self.step = len(self.moves_history)
 
     # -----------------------
     # IA SETTINGS
@@ -274,6 +262,17 @@ class Connect4GUI:
     def set_depth(self):
         d = simpledialog.askinteger("Profondeur","Nouvelle profondeur :", minvalue=1, maxvalue=8)
         if d: self.depth=d
+
+    # -----------------------
+    # Minimax 1 coup sans BDD
+    # -----------------------
+    def play_ai_once(self):
+        current = self.game.current_player
+        _, col = minimax(self.game, self.depth, -9999999, 9999999, True, current)
+        if col is not None:
+            self.game.play(col)
+            self.moves_history.append(col)
+            self.update_board()
 
 # -----------------------
 # Lancement

@@ -1,11 +1,13 @@
+ #app.py
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from game import Game
 from puissance4 import check_victory
 from save_to_db import save_game_from_list
-from db import get_statistics, get_connection, insert_game
-
+from db import get_statistics, get_connection
+from minimax import minimax
 import random
 import os
+
 app = Flask(__name__)
 
 # stockage des parties
@@ -69,11 +71,14 @@ def play_move():
     # ---------------- IA ----------------
     winner, _ = check_victory(game.board)
     if not winner and (mode == 0 or (mode == 1 and game.current_player == "Y")):
-        from minimax import minimax
         if ai_type == "random":
             ai_col = random.choice(game.valid_moves())
         else:
-            _, ai_col = minimax(game, depth, True, game.current_player)
+            maximizing = True
+            ai_player = game.current_player
+            alpha = -9999999
+            beta = 9999999
+            _, ai_col = minimax(game, depth, alpha, beta, maximizing, ai_player)
         if ai_col is not None:
             game.play(ai_col)
             game_info["moves"].append(ai_col)
@@ -81,13 +86,11 @@ def play_move():
     # ---------------- CHECK WIN ----------------
     winner, line = check_victory(game.board)
 
-    # **SAUVEGARDE AUTOMATIQUE SUPPRIMÉE**
-
     return jsonify({
         "board": game.board,
         "winner": winner,
         "current_player": game.current_player,
-        "line": line  # ligne gagnante ajoutée
+        "line": line
     })
 
 # ---------------- UNDO ----------------
@@ -163,17 +166,13 @@ def save_game():
 
     conn = get_connection()
     cur = conn.cursor()
-
-    # Vérifie si cette partie existe déjà
     cur.execute("SELECT id FROM games WHERE moves = %s", (moves,))
     existing = cur.fetchone()
-
     if existing:
         cur.close()
         conn.close()
         return jsonify({"message": "Cette partie existe déjà !"}), 200
 
-    # Sinon, on insère
     cur.execute(
         "INSERT INTO games (player1, player2, moves, winner) VALUES (%s, %s, %s, %s)",
         ("Player1", "Player2", moves, w)
@@ -181,7 +180,6 @@ def save_game():
     conn.commit()
     cur.close()
     conn.close()
-
     game_info["saved"] = True
 
     return jsonify({"message": f"Partie sauvegardée : {game_id}"})
@@ -208,6 +206,7 @@ def history():
     conn.close()
     return render_template("history.html", games=games_list)
 
+# ---------------- START BGA GAME ----------------
 @app.route("/start_bga_game", methods=["POST"])
 def start_bga_game():
     data = request.json
@@ -215,29 +214,24 @@ def start_bga_game():
     if not moves:
         return jsonify({"error": "Aucun coup fourni"}), 400
 
-    # Crée une nouvelle partie
     game_id = len(games) + 1
     games[game_id] = {
         "game": Game(),
-        "mode": 2,  # Humain vs Humain pour rejouer la partie
+        "mode": 2,  # Humain vs Humain
         "moves": [],
         "ai_type": "none",
         "saved": False
     }
 
     game_obj = games[game_id]["game"]
-    valid_moves = game_obj.valid_moves()
-
     for col in moves:
-        if col in valid_moves:
+        if col in game_obj.valid_moves():
             game_obj.play(col)
             games[game_id]["moves"].append(col)
         else:
             print(f"Ignoré coup invalide : {col}")
 
     return jsonify({"game_id": game_id})
-# ---------------- BGA SCRAPER ----------------
-
 
 # ---------------- AI MOVE ----------------
 @app.route("/ai_move", methods=["POST"])
@@ -252,11 +246,14 @@ def ai_move():
     ai_type = game_info["ai_type"]
     depth = game_info["ai_depth"]
 
-    from minimax import minimax
     if ai_type == "random":
         ai_col = random.choice(game.valid_moves())
     else:
-        _, ai_col = minimax(game, depth, True, game.current_player)
+        maximizing = True
+        ai_player = game.current_player
+        alpha = -9999999
+        beta = 9999999
+        _, ai_col = minimax(game, depth, alpha, beta, maximizing, ai_player)
 
     if ai_col is not None:
         game.play(ai_col)
