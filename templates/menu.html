@@ -12,9 +12,12 @@
             <button type="submit" name="mode" value="0">IA vs IA</button>
             <button type="submit" name="mode" value="1">Humain vs IA</button>
             <button type="submit" name="mode" value="2">Humain vs Humain</button>
+            
         </form>
+        <a href="{{ url_for('paint_page') }}" class="menu-link">🎨 Mode Paint</a>
         <a href="{{ url_for('stats') }}" class="menu-link">📊 Statistiques</a>
         <a href="{{ url_for('history') }}" class="menu-link">🕘 Historique des parties</a>
+        
         <div class="bga-container">
             <h3>Charger une partie BGA</h3>
             <input type="text" id="bga_url" placeholder="Lien BGA">

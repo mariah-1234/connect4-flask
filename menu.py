@@ -1,7 +1,10 @@
+
+#menu.py 
 import tkinter as tk
 from gui import Connect4GUI
 from stats_viewer import StatsViewer
 from  game_db_viewer_final import  GameDBViewer
+from paint_gui import PaintGUI
 class Menu:
     def __init__(self):
         # Fenêtre principale
@@ -49,16 +52,23 @@ class Menu:
                   command=lambda: self.lancer(1), **btn_config).pack(pady=8)
         tk.Button(button_frame, text="2 : Humain vs Humain", bg="#f1c40f", activebackground="#f39c12",
                   command=lambda: self.lancer(2), **btn_config).pack(pady=8)
+        tk.Button(button_frame, text="🎨 Mode Paint", bg="#1abc9c", activebackground="#16a085",
+                  command=self.lancer_paint, **btn_config).pack(pady=8)
         tk.Button(button_frame, text="Statistiques", bg="#9b59b6", activebackground="#8e44ad",
                   command=StatsViewer, **btn_config).pack(pady=8)
-        tk.Button(button_frame, text="Quitter", bg="#e74c3c", activebackground="#c0392b",
-                  command=self.root.destroy, **btn_config).pack(pady=8)
-        tk.Button(button_frame, text="Explorer la base", 
+        tk.Button(button_frame, text="Explorer la base", bg="#975048", activebackground="#944E47",
                   command= GameDBViewer, **btn_config).pack(pady=8)
+        tk.Button(button_frame, text="Quitter", bg="#e74c3c", activebackground="#8a4f49",
+                  command=self.root.destroy, **btn_config).pack(pady=8)
         
+       
         self.root.mainloop()
 
+    def lancer_paint(self):
+        self.root.destroy()
+        PaintGUI()
+
     def lancer(self, mode):
-        # Détruire le menu et lancer le jeu
         self.root.destroy()
         Connect4GUI(mode)
+        

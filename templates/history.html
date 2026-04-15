@@ -1,12 +1,15 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-    <title>Historique</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8">
+    <title>Historique des parties</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <h1>Historique des parties</h1>
-    <a href="/">Retour au menu</a>
+
+    <a class="menu-link" href="{{ url_for('menu') }}">⬅ Retour au menu</a>
+
     <table>
         <thead>
             <tr>
@@ -15,25 +18,36 @@
                 <th>Player 2</th>
                 <th>Moves</th>
                 <th>Winner</th>
+                <th>Replay</th>
             </tr>
         </thead>
         <tbody>
         {% for g in games %}
             <tr>
-                <td>{{g[0]}}</td>
-                <td>{{g[1]}}</td>
-                <td>{{g[2]}}</td>
-                <td>{{g[3]}}</td>
-                <td>{{g[4]}}</td>
+                <td>{{ g[0] }}</td>
+                <td>{{ g[1] }}</td>
+                <td>{{ g[2] }}</td>
+                <td>{{ g[3] if g[3] else "-" }}</td>
+                <td>
+                    {% if g[4] == 1 %}
+                        Rouge
+                    {% elif g[4] == 2 %}
+                        Jaune
+                    {% else %}
+                        Aucun
+                    {% endif %}
+                </td>
+                <td>
+                    <a class="replay-btn" href="{{ url_for('replay_game', db_game_id=g[0]) }}">
+                        ▶ Rejouer
+                    </a>
+                </td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
 
-    
-
     <script>
-        // Hover dynamique sur chaque ligne
         document.querySelectorAll('table tbody tr').forEach(row => {
             row.addEventListener('mouseenter', () => {
                 row.style.transform = 'scale(1.02)';

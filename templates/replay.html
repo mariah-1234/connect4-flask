@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Replay</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<h1>Replay de la partie</h1>
+
+<canvas id="board" width="450" height="550"></canvas>
+
+<div>
+    <button onclick="prevMove()">⬅ Précédent</button>
+    <button onclick="nextMove()">➡ Suivant</button>
+</div>
+
+<a class="menu-link" href="{{ url_for('history') }}">⬅ Retour</a>
+
+<script>
+let game_id = {{ game_id }};
+let board = [];
+
+function drawBoard() {
+    const canvas = document.getElementById("board");
+    const ctx = canvas.getContext("2d");
+
+    const CELL = 50;
+    const TOP = 60;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let r = 0; r < board.length; r++) {
+        for (let c = 0; c < board[r].length; c++) {
+            const x = c * CELL;
+            const y = TOP + r * CELL;
+
+            ctx.beginPath();
+            ctx.arc(x + CELL/2, y + CELL/2, CELL/2 - 5, 0, Math.PI*2);
+
+            if (board[r][c] === "R") ctx.fillStyle = "red";
+            else if (board[r][c] === "Y") ctx.fillStyle = "yellow";
+            else ctx.fillStyle = "white";
+
+            ctx.fill();
+            ctx.stroke();
+        }
+    }
+}
+
+async function nextMove() {
+    const res = await fetch("/replay_step", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({game_id, direction: "next"})
+    });
+
+    const data = await res.json();
+    board = data.board;
+    drawBoard();
+}
+
+async function prevMove() {
+    const res = await fetch("/replay_step", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({game_id, direction: "prev"})
+    });
+
+    const data = await res.json();
+    board = data.board;
+    drawBoard();
+}
+
+// init vide
+window.onload = () => {
+    board = Array.from({length: 9}, () => Array(9).fill("."));
+    drawBoard();
+};
+</script>
+
+</body>
+</html>

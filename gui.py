@@ -21,22 +21,28 @@ COLORS = {
     ".": "white"
 }
 
+
 class Connect4GUI:
     def __init__(self, mode):
         self.mode = mode
         self.ai_one_move = False
         self.game_saved = False
         self.moves_history = []
+        self.game_over = False
 
         self.root = tk.Tk()
         self.root.title("Puissance 4")
 
         self.game = Game()
         self.ai_player = "Y"
-        self.ai_enabled = (mode in [0,1])
-        self.human_enabled = (mode in [1,2])
+        self.ai_enabled = (mode in [0, 1])
+        self.human_enabled = (mode in [1, 2])
         self.ai_type = "minimax"
-        self.depth = AI_DEPTH
+
+        if mode == 0:
+            self.depth = 3
+        else:
+            self.depth = AI_DEPTH
 
         # Canvas adapté pour 9x9
         w = COLS * CELL
@@ -47,7 +53,8 @@ class Connect4GUI:
 
         # Texte joueur
         self.turn_text = self.canvas.create_text(
-            w//2, TOP_MARGIN//2,
+            w // 2,
+            TOP_MARGIN // 2,
             text=f"Au tour du joueur {self.game.current_player}",
             fill="white",
             font=("Arial", 12, "bold")
@@ -66,12 +73,12 @@ class Connect4GUI:
     # Dessin plateau et poids / colonnes
     # -----------------------
     def draw_static(self):
-        self.cells = [[None]*COLS for _ in range(ROWS)]
+        self.cells = [[None] * COLS for _ in range(ROWS)]
 
         # Numéros de colonnes
         for c in range(COLS):
             self.canvas.create_text(
-                c*CELL + CELL//2,
+                c * CELL + CELL // 2,
                 TOP_MARGIN - 20,
                 text=str(c),
                 fill="white",
@@ -80,12 +87,12 @@ class Connect4GUI:
 
         for r in range(ROWS):
             for c in range(COLS):
-                x1 = c*CELL
-                y1 = TOP_MARGIN + r*CELL
+                x1 = c * CELL
+                y1 = TOP_MARGIN + r * CELL
                 x2 = x1 + CELL
                 y2 = y1 + CELL
                 self.cells[r][c] = self.canvas.create_oval(
-                    x1+5, y1+5, x2-5, y2-5,
+                    x1 + 5, y1 + 5, x2 - 5, y2 - 5,
                     fill="white",
                     outline="black"
                 )
@@ -94,8 +101,8 @@ class Connect4GUI:
         self.weights = []
         for c in range(COLS):
             t = self.canvas.create_text(
-                c*CELL + CELL//2,
-                TOP_MARGIN + ROWS*CELL + 20,
+                c * CELL + CELL // 2,
+                TOP_MARGIN + ROWS * CELL + 20,
                 text="",
                 fill="white",
                 font=("Arial", 11, "bold")
@@ -126,66 +133,99 @@ class Connect4GUI:
             for c in range(COLS):
                 self.canvas.itemconfig(self.cells[r][c], fill=COLORS[self.game.board[r][c]])
 
-        self.canvas.itemconfig(self.turn_text, text=f"Au tour du joueur {self.game.current_player}")
+        winner, line = check_victory(self.game.board)
+
+        if winner:
+            self.game_over = True
+            for r, c in line:
+                self.canvas.itemconfig(self.cells[r][c], fill="green")
+            self.canvas.itemconfig(self.turn_text, text=f"Victoire : {winner}")
+        else:
+            self.canvas.itemconfig(self.turn_text, text=f"Au tour du joueur {self.game.current_player}")
+
         self.update_weights()
-        self.highlight_winner()
 
     # -----------------------
     # Poids Minimax
     # -----------------------
     def update_weights(self):
-        if not self.ai_enabled or self.game.current_player != self.ai_player:
+        if self.game_over:
+            for c in range(COLS):
+                self.canvas.itemconfig(self.weights[c], text="")
             return
+
+        if not self.ai_enabled or self.game.current_player != self.ai_player:
+            for c in range(COLS):
+                self.canvas.itemconfig(self.weights[c], text="")
+            return
+
         for c in range(COLS):
             if c not in self.game.valid_moves():
                 self.canvas.itemconfig(self.weights[c], text="X")
                 continue
+
             g = self.game.copy()
             g.play(c)
-            score,_ = minimax(g, self.depth, -9999999, 9999999, False, self.ai_player)
+            score, _ = minimax(g, self.depth, -9999999, 9999999, False, self.ai_player)
             self.canvas.itemconfig(self.weights[c], text=str(score))
-
-    # -----------------------
-    # Surbrillance gagnant
-    # -----------------------
-    def highlight_winner(self):
-        winner, line = check_victory(self.game.board)
-        if winner:
-            for r, c in line:
-                self.canvas.itemconfig(self.cells[r][c], fill="green")
 
     # -----------------------
     # Click humain
     # -----------------------
     def on_click(self, event):
-        if (self.mode == 0) or (self.mode==1 and self.game.current_player==self.ai_player):
+        if self.game_over:
             return
+
+        if (self.mode == 0) or (self.mode == 1 and self.game.current_player == self.ai_player):
+            return
+
         col = event.x // CELL
         if col not in self.game.valid_moves():
             return
+
         self.game.play(col)
         self.moves_history.append(col)
         self.update_board()
-        if self.mode in [0,1]:
+
+        if self.game_over:
+            return
+
+        if self.mode in [0, 1]:
             self.root.after(100, self.ai_turn)
 
     # -----------------------
     # Tour IA complet (mode automatique)
     # -----------------------
     def ai_turn(self):
+        if self.game_over:
+            return
+
+        winner, _ = check_victory(self.game.board)
+        if winner:
+            self.game_over = True
+            self.update_board()
+            return
+
         if self.mode == 2 or not self.game.valid_moves():
             return
+
         current = self.game.current_player
-        if self.ai_type=="random":
+
+        if self.ai_type == "random":
             import random
             col = random.choice(self.game.valid_moves())
         else:
             _, col = minimax(self.game, self.depth, -9999999, 9999999, True, current)
+
         if col is not None:
             self.game.play(col)
             self.moves_history.append(col)
             self.update_board()
-        if self.mode==0:
+
+        if self.game_over:
+            return
+
+        if self.mode == 0:
             self.root.after(300, self.ai_turn)
 
     # -----------------------
@@ -195,14 +235,16 @@ class Connect4GUI:
         if self.moves_history:
             self.moves_history.pop()
         self.game.undo()
+        self.game_over = False
         self.update_board()
 
     def restart(self):
         self.game = Game()
         self.moves_history = []
         self.game_saved = False
-        self.ai_enabled = (self.mode in [0,1])
-        self.human_enabled = (self.mode in [1,2])
+        self.game_over = False
+        self.ai_enabled = (self.mode in [0, 1])
+        self.human_enabled = (self.mode in [1, 2])
         self.update_board()
 
     def save(self):
@@ -211,7 +253,7 @@ class Connect4GUI:
         if name:
             save_game_from_list(
                 player1="Humain",
-                player2="IA" if self.mode==1 else "Humain",
+                player2="IA" if self.mode == 1 else "Humain",
                 mode=self.mode,
                 moves_list=self.moves_history
             )
@@ -222,17 +264,22 @@ class Connect4GUI:
     # Load (BDD ou TXT)
     # -----------------------
     def load_txt_or_db(self):
-        file_path = filedialog.askopenfilename(title="Charger fichier TXT", filetypes=[("Text files","*.txt")])
+        file_path = filedialog.askopenfilename(
+            title="Charger fichier TXT",
+            filetypes=[("Text files", "*.txt")]
+        )
+
         if file_path:
             import os
             name = os.path.basename(file_path)
-            moves_string = name.replace(".txt","")
+            moves_string = name.replace(".txt", "")
             if not moves_string.isdigit():
                 messagebox.showerror("Erreur", "Nom fichier doit contenir seulement des chiffres")
                 return
             self.game = Game()
             self.moves_history = [int(c) for c in moves_string]
             self.game_saved = False
+            self.game_over = False
             self.moves_history_play_all()
             self.update_board()
             return
@@ -241,12 +288,22 @@ class Connect4GUI:
         if not saves:
             messagebox.showerror("Erreur", "Aucune sauvegarde")
             return
-        name = simpledialog.askstring("Chargement", "Sauvegardes disponibles:\n" + "\n".join(saves))
+
+        name = simpledialog.askstring(
+            "Chargement",
+            "Sauvegardes disponibles:\n" + "\n".join(saves)
+        )
         if name:
-            self.game = load_game(name.replace(".p4",""))
-            self.moves_history = self.game.history.copy()
+            self.game = load_game(name.replace(".p4", ""))
+
+            # selon ta classe Game, c'est moves et pas history
+            if hasattr(self.game, "moves"):
+                self.moves_history = self.game.moves.copy()
+            else:
+                self.moves_history = []
+
             self.game_saved = False
-            self.moves_history_play_all()
+            self.game_over = False
             self.update_board()
 
     def moves_history_play_all(self):
@@ -257,22 +314,37 @@ class Connect4GUI:
     # -----------------------
     # IA SETTINGS
     # -----------------------
-    def set_random(self): self.ai_type="random"
-    def set_minimax(self): self.ai_type="minimax"
+    def set_random(self):
+        self.ai_type = "random"
+
+    def set_minimax(self):
+        self.ai_type = "minimax"
+
     def set_depth(self):
-        d = simpledialog.askinteger("Profondeur","Nouvelle profondeur :", minvalue=1, maxvalue=8)
-        if d: self.depth=d
+        d = simpledialog.askinteger("Profondeur", "Nouvelle profondeur :", minvalue=1, maxvalue=8)
+        if d:
+            self.depth = d
 
     # -----------------------
-    # Minimax 1 coup sans BDD
+    # IA 1 coup
     # -----------------------
     def play_ai_once(self):
+        if self.game_over:
+            return
+
         current = self.game.current_player
-        _, col = minimax(self.game, self.depth, -9999999, 9999999, True, current)
+
+        if self.ai_type == "random":
+            import random
+            col = random.choice(self.game.valid_moves())
+        else:
+            _, col = minimax(self.game, self.depth, -9999999, 9999999, True, current)
+
         if col is not None:
             self.game.play(col)
             self.moves_history.append(col)
             self.update_board()
+
 
 # -----------------------
 # Lancement

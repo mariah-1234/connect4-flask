@@ -7,19 +7,20 @@ from datetime import datetime
 # Connexion PostgreSQL
 # ==========================
 def get_connection():
-    # Si DATABASE_URL est défini (Render ou autre prod)
     db_url = os.environ.get("DATABASE_URL")
+
     if db_url:
+        print("Connexion à PostgreSQL via DATABASE_URL")
         return psycopg2.connect(db_url)
-    else:
-        # Connexion locale pour tests
-        return psycopg2.connect(
-            dbname="connect4",
-            user="postgres",
-            password="MARIA",
-            host="localhost",
-            port=5432
-        )
+
+    print("Connexion à PostgreSQL local")
+    return psycopg2.connect(
+        dbname="connect4",
+        user="postgres",
+        password="MARIA",
+        host="localhost",
+        port=5432
+    )
 
 # ==========================
 # Encode / Decode Base3
@@ -31,11 +32,11 @@ def encode_base3(board):
 
 def decode_base3(base3_str):
     """Decode base3 string en plateau 2D 9x9"""
-    board = [[0]*9 for _ in range(9)]
+    board = [[0] * 9 for _ in range(9)]
     base3_str = base3_str.zfill(81)
     for r in range(9):
         for c in range(9):
-            board[r][c] = int(base3_str[r*9 + c])
+            board[r][c] = int(base3_str[r * 9 + c])
     return board
 
 def sym_board(board):
@@ -47,8 +48,8 @@ def sym_board(board):
 # ==========================
 def insert_situation(base3_hex, sym_base3_hex=None, rows=8, cols=9, result=3, confidence=1):
     if sym_base3_hex is None:
-        sym_base3_hex = base3_hex[::-1]  # simple symétrie
-    
+        sym_base3_hex = base3_hex[::-1]
+
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
@@ -177,6 +178,7 @@ def fetch_games(limit=500):
     rows = cur.fetchall()
     cur.close()
     conn.close()
+
     games = []
     for r in rows:
         games.append({
