@@ -53,7 +53,6 @@ function drawBoard() {
             ctx.fill();
             ctx.stroke();
 
-            // Encadrement de la dernière case jouée
             if (lastMoveCell && lastMoveCell.row === r && lastMoveCell.col === c) {
                 ctx.strokeStyle = "black";
                 ctx.lineWidth = 4;
@@ -76,7 +75,6 @@ function drawColumnScores(scores, bestMove) {
     const ROWS = board.length;
     const COLS = board[0].length;
 
-    // Efface la zone des scores en bas
     ctx.clearRect(0, TOP_MARGIN + ROWS * CELL, canvas.width, 40);
 
     for (let c = 0; c < COLS; c++) {
@@ -105,12 +103,16 @@ function clearColumnScores() {
 }
 
 // ================= ANALYSE TEXTE PAINT =================
-function updatePaintAnalysis(prediction, bestMove) {
+function updatePaintAnalysis(prediction, bestMove, depth = null) {
     const predictionEl = document.getElementById("prediction");
     const bestMoveEl = document.getElementById("bestmove");
 
     if (predictionEl) {
-        predictionEl.innerText = "Prédiction : " + (prediction || "-");
+        if (depth !== null && depth !== undefined) {
+            predictionEl.innerText = "Prédiction (profondeur " + depth + ") : " + (prediction || "-");
+        } else {
+            predictionEl.innerText = "Prédiction : " + (prediction || "-");
+        }
     }
 
     if (bestMoveEl) {
@@ -259,7 +261,7 @@ async function saveGame() {
     });
 
     const data = await res.json();
-    alert(data.message);
+    alert(data.message || data.error);
 }
 
 async function setAI(type) {
@@ -491,6 +493,8 @@ async function paintClick(row, col) {
     if (data.winner) {
         gameFinished = true;
         if (status) status.innerText = "Victoire : " + data.winner;
+    } else {
+        if (status) status.innerText = "Plateau modifié";
     }
 
     resetPaintAnalysis();
@@ -498,6 +502,9 @@ async function paintClick(row, col) {
 }
 
 async function paintSuggest() {
+    const status = document.getElementById("status");
+    if (status) status.innerText = "🔍 Analyse en cours...";
+
     const res = await fetch("/paint_analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -514,14 +521,27 @@ async function paintSuggest() {
     board = data.board;
     winningLine = data.line || [];
     drawBoard();
-    drawColumnScores(data.column_scores, data.best_move);
-    updatePaintAnalysis(data.prediction, data.best_move);
+
+    if (data.column_scores && Object.keys(data.column_scores).length > 0) {
+        drawColumnScores(data.column_scores, data.best_move);
+      } else {
+          clearColumnScores();
+    }   
+
+    updatePaintAnalysis(data.prediction, data.best_move, data.depth);
     updateForcedPrediction(data.forced_prediction);
 
-    const status = document.getElementById("status");
-    if (data.winner && status) {
-        gameFinished = true;
-        status.innerText = "Victoire : " + data.winner;
+    if (status) {
+        if (data.winner) {
+            gameFinished = true;
+            status.innerText = "Victoire : " + data.winner;
+        } else {
+            status.innerText =
+                "Analyse terminée - Tour : " + data.current_player +
+                (data.best_move !== null && data.best_move !== undefined
+                    ? " - meilleur coup : colonne " + data.best_move
+                    : "");
+        }
     }
 }
 
@@ -530,8 +550,8 @@ async function paintAIMove(showAnalysis = true) {
 
     const status = document.getElementById("status");
 
-    if (showAnalysis && status) {
-        status.innerText = "🤖 IA réfléchit...";
+    if (status) {
+        status.innerText = showAnalysis ? "🤖 IA réfléchit..." : "IA vs IA en cours...";
     }
 
     paintThinking = true;
@@ -541,7 +561,10 @@ async function paintAIMove(showAnalysis = true) {
         const res = await fetch("/paint_ai_move", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ game_id })
+            body: JSON.stringify({
+                game_id,
+                analyze: showAnalysis
+            })
         });
 
         const data = await res.json();
@@ -578,7 +601,7 @@ async function paintAIMove(showAnalysis = true) {
 
         if (status) {
             status.innerText = showAnalysis
-                ? "🤖 IA a joué"
+                ? "🤖 IA a joué un seul coup"
                 : "IA vs IA en cours...";
         }
     } catch (err) {
@@ -590,6 +613,8 @@ async function paintAIMove(showAnalysis = true) {
 }
 
 async function paintAIAuto() {
+    if (gameFinished || paintThinking) return;
+
     autoPaint = true;
     clearColumnScores();
     resetPaintAnalysis();
@@ -656,7 +681,7 @@ async function savePaintGame() {
     });
 
     const data = await res.json();
-    alert(data.message);
+    alert(data.message || data.error);
 }
 
 async function setPaintAI(type) {
@@ -670,7 +695,7 @@ async function setPaintAI(type) {
 }
 
 async function setPaintDepth() {
-    const d = prompt("Nouvelle profondeur (1-8) :", 4);
+    const d = prompt("Nouvelle profondeur (1-8) :", 6);
     if (!d) return;
 
     await fetch("/paint_set_ai_depth", {

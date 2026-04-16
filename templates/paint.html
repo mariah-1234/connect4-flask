@@ -14,7 +14,6 @@
     <p id="prediction">Prédiction : -</p>
     <p id="forcedprediction">Analyse complète : -</p>
     <p id="bestmove">Meilleur coup conseillé : -</p>
-   
 
     <canvas id="board" width="450" height="570"></canvas>
 
@@ -25,13 +24,13 @@
 
         <button onclick="triggerPaintImport()">📂 Importer fichier</button>
         <input type="file" id="paint-file-input" accept=".txt,.json" style="display:none" onchange="importPaintFile(event)">
-    
-        <button onclick="paintAIMove()">🤖 IA joue</button>
-        <button onclick="undoPaint()">↩ Undo</button>
+
+        <button onclick="paintSuggest()">🔍 Analyser</button>
+        <button onclick="paintAIMove(true)">🤖 IA joue 1 coup</button>
         <button onclick="paintAIAuto()">🔁 IA vs IA</button>
         <button onclick="stopAutoPaint()">⏹ Stop</button>
+        <button onclick="undoPaint()">↩ Undo</button>
         <button onclick="setPaintDepth()">Profondeur</button>
-        
         <button onclick="restartPaint()">Restart</button>
         <button onclick="savePaintGame()">💾 Save</button>
         <button onclick="goMenu()">🏠 Menu</button>

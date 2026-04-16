@@ -10,6 +10,7 @@ import os
 import json
 from werkzeug.utils import secure_filename
 from init_db import init_db
+
 app = Flask(__name__)
 
 # stockage des parties en mémoire
@@ -46,6 +47,11 @@ def board_key(board):
     return tuple(tuple(row) for row in board)
 
 
+def ordered_moves(valid_moves):
+    center = COLS // 2
+    return sorted(valid_moves, key=lambda c: abs(c - center))
+
+
 def forced_outcome_search(game, depth, root_player, cache=None):
     if cache is None:
         cache = {}
@@ -74,72 +80,108 @@ def forced_outcome_search(game, depth, root_player, cache=None):
         cache[key] = result
         return result
 
-    children = []
-    for col in valid:
-        g = game.copy()
-        g.play(col)
-        outcome, plies = forced_outcome_search(g, depth - 1, root_player, cache)
-        children.append((col, outcome, plies))
-
     current = game.current_player
+    valid = ordered_moves(valid)
 
     if current == root_player:
-        winning = [(c, o, p) for c, o, p in children if o == 1]
-        drawing = [(c, o, p) for c, o, p in children if o == 0]
-        losing = [(c, o, p) for c, o, p in children if o == -1]
-        unknown = [(c, o, p) for c, o, p in children if o is None]
+        best_win = None
+        best_draw = None
+        best_loss = None
+        unknown_found = False
 
-        if winning:
-            best = min(winning, key=lambda x: x[2])
-            result = (1, best[2] + 1)
-            cache[key] = result
-            return result
+        for col in valid:
+            g = game.copy()
+            g.play(col)
+            outcome, plies = forced_outcome_search(g, depth - 1, root_player, cache)
 
-        if drawing:
-            best = min(drawing, key=lambda x: x[2])
-            result = (0, best[2] + 1)
-            cache[key] = result
-            return result
+            if outcome == 1:
+                candidate = (1, plies + 1)
+                if best_win is None or candidate[1] < best_win[1]:
+                    best_win = candidate
 
-        if unknown:
+            elif outcome == 0:
+                candidate = (0, plies + 1)
+                if best_draw is None or candidate[1] < best_draw[1]:
+                    best_draw = candidate
+
+            elif outcome == -1:
+                candidate = (-1, plies + 1)
+                if best_loss is None or candidate[1] > best_loss[1]:
+                    best_loss = candidate
+
+            else:
+                unknown_found = True
+
+            if best_win is not None and best_win[1] == 1:
+                cache[key] = best_win
+                return best_win
+
+        if best_win is not None:
+            cache[key] = best_win
+            return best_win
+
+        if best_draw is not None:
+            cache[key] = best_draw
+            return best_draw
+
+        if unknown_found:
             result = (None, None)
             cache[key] = result
             return result
 
-        if losing:
-            best = max(losing, key=lambda x: x[2])
-            result = (-1, best[2] + 1)
-            cache[key] = result
-            return result
+        if best_loss is not None:
+            cache[key] = best_loss
+            return best_loss
 
     else:
-        winning_for_root = [(c, o, p) for c, o, p in children if o == 1]
-        drawing = [(c, o, p) for c, o, p in children if o == 0]
-        losing_for_root = [(c, o, p) for c, o, p in children if o == -1]
-        unknown = [(c, o, p) for c, o, p in children if o is None]
+        best_loss_for_root = None
+        best_draw = None
+        best_win_for_root = None
+        unknown_found = False
 
-        if losing_for_root:
-            best = min(losing_for_root, key=lambda x: x[2])
-            result = (-1, best[2] + 1)
-            cache[key] = result
-            return result
+        for col in valid:
+            g = game.copy()
+            g.play(col)
+            outcome, plies = forced_outcome_search(g, depth - 1, root_player, cache)
 
-        if drawing:
-            best = min(drawing, key=lambda x: x[2])
-            result = (0, best[2] + 1)
-            cache[key] = result
-            return result
+            if outcome == -1:
+                candidate = (-1, plies + 1)
+                if best_loss_for_root is None or candidate[1] < best_loss_for_root[1]:
+                    best_loss_for_root = candidate
 
-        if unknown:
+            elif outcome == 0:
+                candidate = (0, plies + 1)
+                if best_draw is None or candidate[1] < best_draw[1]:
+                    best_draw = candidate
+
+            elif outcome == 1:
+                candidate = (1, plies + 1)
+                if best_win_for_root is None or candidate[1] > best_win_for_root[1]:
+                    best_win_for_root = candidate
+
+            else:
+                unknown_found = True
+
+            if best_loss_for_root is not None and best_loss_for_root[1] == 1:
+                cache[key] = best_loss_for_root
+                return best_loss_for_root
+
+        if best_loss_for_root is not None:
+            cache[key] = best_loss_for_root
+            return best_loss_for_root
+
+        if best_draw is not None:
+            cache[key] = best_draw
+            return best_draw
+
+        if unknown_found:
             result = (None, None)
             cache[key] = result
             return result
 
-        if winning_for_root:
-            best = max(winning_for_root, key=lambda x: x[2])
-            result = (1, best[2] + 1)
-            cache[key] = result
-            return result
+        if best_win_for_root is not None:
+            cache[key] = best_win_for_root
+            return best_win_for_root
 
     result = (None, None)
     cache[key] = result
@@ -148,7 +190,7 @@ def forced_outcome_search(game, depth, root_player, cache=None):
 
 def forced_prediction_text(outcome, plies, root_player):
     if outcome is None or plies is None:
-        return "Incertain"
+        return "Incertain à cette profondeur"
 
     if outcome == 0:
         return "Nul forcé"
@@ -166,13 +208,67 @@ def forced_prediction_text(outcome, plies, root_player):
     return f"{COLOR_NAME[winner]} gagne en {winner_moves} coups"
 
 
+def best_forced_move(game, depth, root_player, cache=None):
+    if cache is None:
+        cache = {}
+
+    valid = ordered_moves(game.valid_moves())
+    if not valid:
+        return None, None, None
+
+    best_col = None
+    best_outcome = None
+    best_plies = None
+
+    for col in valid:
+        g = game.copy()
+        g.play(col)
+
+        outcome, plies = forced_outcome_search(g, depth - 1, root_player, cache)
+
+        if outcome is None:
+            continue
+
+        total_plies = plies + 1
+
+        if best_col is None:
+            best_col = col
+            best_outcome = outcome
+            best_plies = total_plies
+            continue
+
+        # priorité :
+        # 1) victoire la plus rapide
+        # 2) nul
+        # 3) défaite la plus tardive
+        if outcome == 1:
+            if best_outcome != 1 or total_plies < best_plies:
+                best_col = col
+                best_outcome = outcome
+                best_plies = total_plies
+
+        elif outcome == 0:
+            if best_outcome not in [1, 0] or (best_outcome == 0 and total_plies < best_plies):
+                best_col = col
+                best_outcome = outcome
+                best_plies = total_plies
+
+        elif outcome == -1:
+            if best_outcome not in [1, 0, -1] or (best_outcome == -1 and total_plies > best_plies):
+                best_col = col
+                best_outcome = outcome
+                best_plies = total_plies
+
+    return best_col, best_outcome, best_plies
+
+
 def analyze_game_position(game, depth):
     current = game.current_player
 
     winner, _ = check_victory(game.board)
     if winner:
         return {
-            "prediction": f"Victoire : {winner}",
+            "prediction": f"Victoire : {COLOR_NAME[winner]}",
             "best_move": None,
             "global_score": None,
             "column_scores": {},
@@ -189,32 +285,39 @@ def analyze_game_position(game, depth):
             "forced_prediction": "Nul forcé"
         }
 
-    column_scores = {}
-
-    for c in range(COLS):
-        if c not in valid:
-            column_scores[c] = None
-            continue
-
-        g = game.copy()
-        g.play(c)
-        score, _ = minimax(g, depth, -9999999, 9999999, False, current)
-        column_scores[c] = score
-
-    best_move = max(valid, key=lambda col: column_scores[col])
-    global_score, _ = minimax(game, depth, -9999999, 9999999, True, current)
-
     empty_cells = sum(row.count(".") for row in game.board)
-    forced_depth = empty_cells if empty_cells <= 14 else depth
 
-    outcome, plies = forced_outcome_search(game, forced_depth, current, cache={})
+    if empty_cells <= 14:
+        forced_depth = empty_cells
+    else:
+        forced_depth = depth
+
+    # cache partagé pour éviter de recalculer les mêmes positions
+    cache = {}
+
+    outcome, plies = forced_outcome_search(game, forced_depth, current, cache)
     forced_prediction = forced_prediction_text(outcome, plies, current)
 
+    best_move, _, _ = best_forced_move(game, forced_depth, current, cache)
+
+    if outcome == 1:
+        prediction = "Victoire certaine"
+        global_score = 1000000
+    elif outcome == -1:
+        prediction = "Défaite certaine"
+        global_score = -1000000
+    elif outcome == 0:
+        prediction = "Nul probable"
+        global_score = 0
+    else:
+        prediction = "Incertain"
+        global_score = None
+
     return {
-        "prediction": predict_label(global_score),
+        "prediction": prediction,
         "best_move": best_move,
         "global_score": global_score,
-        "column_scores": column_scores,
+        "column_scores": {},
         "forced_prediction": forced_prediction
     }
 
@@ -817,17 +920,18 @@ def paint_page():
     paint_board = [["." for _ in range(COLS)] for _ in range(ROWS)]
 
     games[game_id] = {
-        "game": Game(),
-        "mode": "paint",
-        "moves": [],
-        "moves_known": False,   # vraie séquence connue ou non
-        "ai_type": "minimax",
-        "ai_depth": 4,
-        "saved": False,
-        "paint_board": copy_board(paint_board),
-        "paint_history": [],
-        "game_over": False
-    }
+    "game": Game(),
+    "mode": "paint",
+    "moves": [],
+    "moves_known": False,
+    "moves_history": [],
+    "ai_type": "minimax",
+    "ai_depth": 5,
+    "saved": False,
+    "paint_board": copy_board(paint_board),
+    "paint_history": [],
+    "game_over": False
+}
 
     return render_template(
         "paint.html",
@@ -874,10 +978,15 @@ def paint_import_file():
 
         game_info["paint_board"] = copy_board(board)
         game_info["paint_history"] = []
+        game_info["moves_history"] = []
+
         game_info["game"] = rebuild_game_from_board(board)
         game_info["game"].current_player = current_player
+
+        # IMPORTANT : on garde exactement la vraie séquence si elle existe
         game_info["moves"] = moves[:] if moves else []
         game_info["moves_known"] = bool(moves)
+
         game_info["saved"] = False
         game_info["game_over"] = bool(winner)
 
@@ -890,7 +999,6 @@ def paint_import_file():
 
     except Exception as e:
         return jsonify({"error": f"Import impossible : {str(e)}"}), 400
-
 
 # =========================================================
 # PAINT CLICK
@@ -917,10 +1025,16 @@ def paint_click():
     if value not in ["R", "Y", "."]:
         return jsonify({"error": "Invalid value"}), 400
 
+    # on sauvegarde l'état précédent pour undo
     game_info.setdefault("paint_history", []).append(copy_board(game_info["paint_board"]))
-    game_info["paint_board"][row][col] = value
+    game_info.setdefault("moves_history", []).append({
+        "moves": game_info["moves"][:],
+        "moves_known": game_info["moves_known"]
+    })
 
-    # plateau modifié à la main => vraie séquence perdue
+    # modification manuelle => séquence réelle perdue
+    game_info["paint_board"][row][col] = value
+    game_info["moves"] = []
     game_info["moves_known"] = False
 
     winner, line = check_victory(game_info["paint_board"])
@@ -931,8 +1045,6 @@ def paint_click():
         "winner": winner,
         "line": line
     })
-
-
 # =========================================================
 # PAINT ANALYZE
 # =========================================================
@@ -962,7 +1074,8 @@ def paint_analyze():
         "prediction": analysis["prediction"],
         "forced_prediction": analysis["forced_prediction"],
         "best_move": analysis["best_move"],
-        "column_scores": analysis["column_scores"]
+        "column_scores": analysis["column_scores"],
+        "depth": game_info["ai_depth"]
     })
 
 
@@ -973,6 +1086,7 @@ def paint_analyze():
 def paint_ai_move():
     data = request.json
     game_id = int(data["game_id"])
+    do_analysis = bool(data.get("analyze", True))
 
     game_info = games.get(game_id)
     if not game_info:
@@ -980,16 +1094,28 @@ def paint_ai_move():
 
     if game_info.get("game_over"):
         winner, line = check_victory(game_info["paint_board"])
-        analysis = analyze_game_position(game_info["game"], game_info["ai_depth"])
-        return jsonify({
-            "board": game_info["paint_board"],
-            "winner": winner,
-            "line": line,
-            "prediction": analysis["prediction"],
-            "forced_prediction": analysis["forced_prediction"],
-            "best_move": analysis["best_move"],
-            "column_scores": analysis["column_scores"]
-        })
+
+        if do_analysis:
+            analysis = analyze_game_position(game_info["game"], game_info["ai_depth"])
+            return jsonify({
+                "board": game_info["paint_board"],
+                "winner": winner,
+                "line": line,
+                "prediction": analysis["prediction"],
+                "forced_prediction": analysis["forced_prediction"],
+                "best_move": analysis["best_move"],
+                "column_scores": analysis["column_scores"]
+            })
+        else:
+            return jsonify({
+                "board": game_info["paint_board"],
+                "winner": winner,
+                "line": line,
+                "prediction": None,
+                "forced_prediction": None,
+                "best_move": None,
+                "column_scores": {}
+            })
 
     paint_board = game_info["paint_board"]
 
@@ -1003,64 +1129,112 @@ def paint_ai_move():
         game_info["game"] = real_game
         game_info["game_over"] = True
 
-        analysis = analyze_game_position(real_game, game_info["ai_depth"])
-
-        return jsonify({
-            "board": game_info["paint_board"],
-            "winner": winner,
-            "line": line,
-            "prediction": analysis["prediction"],
-            "forced_prediction": analysis["forced_prediction"],
-            "best_move": analysis["best_move"],
-            "column_scores": analysis["column_scores"]
-        })
+        if do_analysis:
+            analysis = analyze_game_position(real_game, game_info["ai_depth"])
+            return jsonify({
+                "board": game_info["paint_board"],
+                "winner": winner,
+                "line": line,
+                "prediction": analysis["prediction"],
+                "forced_prediction": analysis["forced_prediction"],
+                "best_move": analysis["best_move"],
+                "column_scores": analysis["column_scores"]
+            })
+        else:
+            return jsonify({
+                "board": game_info["paint_board"],
+                "winner": winner,
+                "line": line,
+                "prediction": None,
+                "forced_prediction": None,
+                "best_move": None,
+                "column_scores": {}
+            })
 
     depth = game_info["ai_depth"]
     valid = real_game.valid_moves()
 
     if not valid:
-        analysis = analyze_game_position(real_game, depth)
-        return jsonify({
-            "board": real_game.board,
-            "winner": None,
-            "line": [],
-            "prediction": analysis["prediction"],
-            "forced_prediction": analysis["forced_prediction"],
-            "best_move": analysis["best_move"],
-            "column_scores": analysis["column_scores"]
-        })
+        if do_analysis:
+            analysis = analyze_game_position(real_game, depth)
+            return jsonify({
+                "board": real_game.board,
+                "winner": None,
+                "line": [],
+                "prediction": analysis["prediction"],
+                "forced_prediction": analysis["forced_prediction"],
+                "best_move": analysis["best_move"],
+                "column_scores": analysis["column_scores"]
+            })
+        else:
+            return jsonify({
+                "board": real_game.board,
+                "winner": None,
+                "line": [],
+                "prediction": None,
+                "forced_prediction": None,
+                "best_move": None,
+                "column_scores": {}
+            })
 
+    # sauvegarde état précédent pour undo
     game_info.setdefault("paint_history", []).append(copy_board(game_info["paint_board"]))
+    game_info.setdefault("moves_history", []).append({
+        "moves": game_info["moves"][:],
+        "moves_known": game_info["moves_known"]
+    })
 
-    analysis = analyze_game_position(real_game, depth)
-    ai_col = analysis["best_move"]
+    if do_analysis:
+        analysis = analyze_game_position(real_game, depth)
+        ai_col = analysis["best_move"]
+    else:
+        if game_info["ai_type"] == "random":
+            ai_col = random.choice(valid)
+        else:
+            _, ai_col = minimax(real_game, depth, -9999999, 9999999, True, current)
 
     if ai_col is not None:
         real_game.play(ai_col)
-
-        # si la vraie séquence est connue, on ajoute le nouveau coup
-        if game_info.get("moves_known", False):
-            game_info["moves"].append(ai_col)
 
     winner, line = check_victory(real_game.board)
 
     game_info["paint_board"] = copy_board(real_game.board)
     game_info["game"] = real_game
+
+    # IMPORTANT :
+    # si la séquence importée est connue, on ajoute exactement le nouveau coup
+    if ai_col is not None and game_info.get("moves_known", False):
+        game_info["moves"].append(ai_col)
+
+    # si la séquence n'est pas connue, on ne tente pas de la reconstruire
+    if not game_info.get("moves_known", False):
+        game_info["moves"] = []
+
     game_info["game_over"] = bool(winner)
 
-    new_analysis = analyze_game_position(real_game, depth)
-
-    return jsonify({
-        "board": game_info["paint_board"],
-        "winner": winner,
-        "line": line,
-        "current_player": real_game.current_player,
-        "prediction": new_analysis["prediction"],
-        "forced_prediction": new_analysis["forced_prediction"],
-        "best_move": new_analysis["best_move"],
-        "column_scores": new_analysis["column_scores"]
-    })
-
+    if do_analysis:
+        new_analysis = analyze_game_position(real_game, depth)
+        return jsonify({
+            "board": game_info["paint_board"],
+            "winner": winner,
+            "line": line,
+            "current_player": real_game.current_player,
+            "prediction": new_analysis["prediction"],
+            "forced_prediction": new_analysis["forced_prediction"],
+            "best_move": new_analysis["best_move"],
+            "column_scores": new_analysis["column_scores"]
+        })
+    else:
+        return jsonify({
+            "board": game_info["paint_board"],
+            "winner": winner,
+            "line": line,
+            "current_player": real_game.current_player,
+            "prediction": None,
+            "forced_prediction": None,
+            "best_move": None,
+            "column_scores": {}
+        })
 
 # =========================================================
 # PAINT UNDO
@@ -1075,6 +1249,7 @@ def paint_undo():
         return jsonify({"error": "Game not found"}), 404
 
     history = game_info.get("paint_history", [])
+    moves_history = game_info.get("moves_history", [])
 
     if not history:
         current = detect_player_from_board(game_info["paint_board"])
@@ -1086,9 +1261,14 @@ def paint_undo():
         })
 
     previous_board = history.pop()
+    previous_moves_state = moves_history.pop() if moves_history else {
+        "moves": [],
+        "moves_known": False
+    }
 
     game_info["paint_board"] = copy_board(previous_board)
-    game_info["moves_known"] = False
+    game_info["moves"] = previous_moves_state["moves"][:]
+    game_info["moves_known"] = previous_moves_state["moves_known"]
 
     real_game = rebuild_game_from_board(previous_board)
     current = detect_player_from_board(real_game.board)
@@ -1105,8 +1285,6 @@ def paint_undo():
         "line": line,
         "current_player": real_game.current_player
     })
-
-
 # =========================================================
 # PAINT RESTART
 # =========================================================
@@ -1124,14 +1302,13 @@ def paint_restart():
     game_info["game"] = Game()
     game_info["moves"] = []
     game_info["moves_known"] = False
+    game_info["moves_history"] = []
     game_info["saved"] = False
     game_info["paint_board"] = copy_board(empty_board)
     game_info["paint_history"] = []
     game_info["game_over"] = False
 
     return jsonify({"board": game_info["paint_board"]})
-
-
 # =========================================================
 # PAINT SAVE
 # =========================================================
@@ -1144,7 +1321,6 @@ def paint_save():
     if not game_info:
         return jsonify({"error": "Game not found"}), 404
 
-    # On sauvegarde uniquement si la vraie séquence des coups est connue
     if not game_info.get("moves_known", False):
         return jsonify({
             "error": "Impossible de sauvegarder cette position en séquence de coups : le plateau a été modifié manuellement et l'ordre exact des coups n'est pas connu."
@@ -1220,6 +1396,6 @@ def paint_set_ai_depth():
 # RUN
 # =========================================================
 if __name__ == "__main__":
-    init_db() 
+    init_db()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
